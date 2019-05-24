@@ -4,7 +4,15 @@ import (
 	"fmt"
 	"mapreduce"
 	"os"
+	"strings"
+	"unicode"
+	"strconv"
 )
+
+//
+func isLetter(r rune) bool{
+	return !unicode.IsLetter(r);
+}
 
 //
 // The map function is called once for each file of input. The first
@@ -15,6 +23,16 @@ import (
 //
 func mapF(filename string, contents string) []mapreduce.KeyValue {
 	// Your code here (Part II).
+	ret := strings.FieldsFunc(contents,isLetter)
+	wcDic := make(map[string]uint64)
+	for _,str := range ret{
+		wcDic[str] += 1
+	}
+	var kvSlice []mapreduce.KeyValue
+	for key,value := range wcDic{
+		kvSlice = append(kvSlice, mapreduce.KeyValue{key, strconv.FormatUint(value,10)})
+	} 
+	return kvSlice
 }
 
 //
@@ -24,6 +42,17 @@ func mapF(filename string, contents string) []mapreduce.KeyValue {
 //
 func reduceF(key string, values []string) string {
 	// Your code here (Part II).
+	var sum uint64
+	sum = 0
+	for _,str := range values{
+		val,err := strconv.ParseUint(str, 10, 0)
+		if err!=nil{
+			return strconv.FormatUint(sum, 10)
+		}
+		sum +=val
+	}
+	return strconv.FormatUint(sum, 10)
+
 }
 
 // Can be run in 3 ways:
