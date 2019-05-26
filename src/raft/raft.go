@@ -54,6 +54,15 @@ type Raft struct {
 	// Your data here (2A, 2B, 2C).
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
+	currentTerm int
+	//status 
+	//0: leader
+	//1: follower
+	//2: candidate
+	status int
+	voteFor int
+	commitIndex int 
+	lastApplied int
 
 }
 
@@ -64,6 +73,12 @@ func (rf *Raft) GetState() (int, bool) {
 	var term int
 	var isleader bool
 	// Your code here (2A).
+	term = rf.currentTerm
+	if rf.status!=0{
+		isleader = false
+	} else {
+		isleader = true
+	}
 	return term, isleader
 }
 
@@ -116,6 +131,10 @@ func (rf *Raft) readPersist(data []byte) {
 //
 type RequestVoteArgs struct {
 	// Your data here (2A, 2B).
+	Term int
+	CandidateId int
+	LastLogIndex int
+	LastLogTerm int
 }
 
 //
@@ -124,6 +143,18 @@ type RequestVoteArgs struct {
 //
 type RequestVoteReply struct {
 	// Your data here (2A).
+	Term int
+	VoteGranted bool
+}
+
+// check if candidates is at least up to date  as reciver
+func isUpToDate(rf *Raft, args *RequestVoteArgs) bool{
+	if args.LastLogTerm > rf.currentTerm{
+		return true
+	} else if args.LastLogTerm == rf.currentTerm && args.LastLogIndex >=rf.lastApplied{
+		return true
+	}
+	return false;
 }
 
 //
@@ -131,6 +162,20 @@ type RequestVoteReply struct {
 //
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
+	if rf.currentTerm>args.Term{
+		reply.Term = rf.currentTerm
+	} else{ 
+		reply.Term = args.Term
+	}
+	if isUpToDate(rf, args){
+		if args.Term>rf.currentTerm || (args.Term == rf.currentTerm && rf.voteFor<0){
+			reply.VoteGranted = true
+		} else {
+			reply.VoteGranted = false
+		} 		
+	} else {
+		reply.VoteGranted = false
+	}
 }
 
 //
@@ -220,8 +265,11 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.peers = peers
 	rf.persister = persister
 	rf.me = me
+	
 
 	// Your initialization code here (2A, 2B, 2C).
+	rf.voteFor = -1
+	rf.status = 2
 
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
