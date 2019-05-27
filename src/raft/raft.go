@@ -63,6 +63,7 @@ type Raft struct {
 	voteFor int
 	commitIndex int 
 	lastApplied int
+	entries []LogEntrie
 
 }
 
@@ -147,11 +148,48 @@ type RequestVoteReply struct {
 	VoteGranted bool
 }
 
+//
+type AppendEntriesArgs struct {
+	Term int
+	LeaderId int
+	PrevLogIndex int
+	PrevLogTerm int
+	Entries []LogEntrie
+}
+
+//
+type AppendEntriesReply struct {
+	Term int
+	Success bool
+}
+
+//
+type LogEntrie struct {
+	Term int
+}
+
+//
+// PRC AppendEntries handler.
+// handler method that resets the election timeout so that other 
+// servers don't step forward as leaders when one has 
+// already been elected.
+func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
+	reply.Term = rf.currentTerm
+	reply.Success = true
+	if args.Entries == nil{
+		if (rf.currentTerm > args.Term) ||
+			(rf.lastApplied < args.PrevLogIndex) ||
+			(rf.lastApplied == args.PrevLogIndex && rf.entries[rf.lastApplied-1].Term != args.PrevLogTerm){
+			reply.Success = false
+		}
+	}
+}
+
 // check if candidates is at least up to date  as reciver
-func isUpToDate(rf *Raft, args *RequestVoteArgs) bool{
-	if args.LastLogTerm > rf.currentTerm{
+func isUpToDate(rf *Raft, term int, index int) bool{
+	if term > rf.currentTerm{
 		return true
-	} else if args.LastLogTerm == rf.currentTerm && args.LastLogIndex >=rf.lastApplied{
+	} else if term == rf.currentTerm && index >=rf.lastApplied{
 		return true
 	}
 	return false;
@@ -162,12 +200,8 @@ func isUpToDate(rf *Raft, args *RequestVoteArgs) bool{
 //
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
-	if rf.currentTerm>args.Term{
-		reply.Term = rf.currentTerm
-	} else{ 
-		reply.Term = args.Term
-	}
-	if isUpToDate(rf, args){
+	reply.Term = rf.currentTerm
+	if isUpToDate(rf, args.LastLogTerm, args.LastLogIndex){
 		if args.Term>rf.currentTerm || (args.Term == rf.currentTerm && rf.voteFor<0){
 			reply.VoteGranted = true
 		} else {
